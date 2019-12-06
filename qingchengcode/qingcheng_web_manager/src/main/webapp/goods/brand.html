@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>品牌管理</title>
+    <link rel="stylesheet" href="../css/elementui.css">
+    <style>
+        .avatar-uploader .el-upload {
+            border: 1px dashed #d9d9d9;
+            border-radius: 6px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .avatar-uploader .el-upload:hover {
+            border-color: #409EFF;
+        }
+        .avatar-uploader-icon {
+            font-size: 28px;
+            color: #8c939d;
+            width: 178px;
+            height: 178px;
+            line-height: 178px;
+            text-align: center;
+        }
+        .avatar {
+            width: 178px;
+            height: 178px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <!--条件查询的表单项-->
+    <el-form :inline="true">
+        <el-form-item label="品牌名称">
+            <el-input placeholder="品牌名称" v-model="searchMap.name"></el-input>
+        </el-form-item>
+        <el-form-item label="品牌首字母">
+            <el-input placeholder="品牌首字母" v-model="searchMap.letter"></el-input>
+        </el-form-item>
+        <el-button type="primary" @click="fetchData">查询</el-button>
+        <el-button type="primary" @click="pojo={},formVisible=true">新增</el-button>
+    </el-form>
+
+
+    <el-table
+            :data="tableData"
+            border
+            style="width: 100%">
+        <el-table-column
+                prop="id"
+                label="ID"
+                width="180">
+        </el-table-column>
+        <el-table-column
+                prop="name"
+                label="名称">
+        </el-table-column>
+        <el-table-column
+                prop="letter"
+                label="首字母"
+                 width="180">
+        </el-table-column>
+        <el-table-column
+                label="图片"
+                width="180">
+            <!--设置图片的模板列-->
+            <template slot-scope="scope">
+                <img width="100px" height="50px" :src="scope.row.image">
+            </template>
+        </el-table-column>
+
+        <!--修改列-->
+        <el-table-column
+                label="操作"
+                width="180">
+            <!--设置图片的模板列-->
+            <template slot-scope="scope">
+               <el-button type="text" size="small" @click="edit(scope.row.id)" >修改</el-button>
+                <el-button type="text" size="small" @click="dele(scope.row.id)" >删除</el-button>
+            </template>
+        </el-table-column>
+    </el-table>
+
+    <!--粘贴分页查询组件-->
+    <el-pagination
+            @size-change="fetchData"
+            @current-change="fetchData"
+            :current-page.sync="currentPage"
+            :page-sizes="[10, 20, 30, 40]"
+            :page-size="size"
+            layout="total, sizes, prev, pager, next, jumper"
+            :total="total">
+    </el-pagination>
+
+
+    <!--用来新增品牌的弹出框-->
+    <el-dialog
+            title="品牌编辑"
+            :visible.sync="formVisible"
+            width="30%"
+            :before-close="handleClose">
+
+        <!--提交的表单-->
+        <el-form label-width="80px">
+            <el-form-item label="品牌名称">
+                <el-input placeholder="品牌名称" v-model="pojo.name"></el-input>
+            </el-form-item>
+            <el-form-item label="品牌首字母">
+                <el-input placeholder="品牌首字母" v-model="pojo.letter"></el-input>
+            </el-form-item>
+            <el-form-item label="品牌图片">
+                <!--上传图片 而在下面的sava方法中吧图片存到数据库中-->
+                <el-upload
+                        class="avatar-uploader"
+                        action="/upload/oss.do"
+                        :show-file-list="false"
+                        :on-success="handleAvatarSuccess"
+                        :before-upload="beforeAvatarUpload">
+                    <img v-if="imageUrl" :src="imageUrl" class="avatar">
+                    <i v-else class="el-icon-plus avatar-uploader-icon"></i>
+                </el-upload>
+            </el-form-item>
+            <el-form-item label="品牌排序">
+                <el-input placeholder="品牌图片" v-model="pojo.seq"></el-input>
+            </el-form-item>
+            <el-form-item>
+                <el-button @click="formVisible = false">关 闭</el-button>
+                <el-button type="primary" @click="sava()">保 存</el-button>
+            </el-form-item>
+        </el-form>
+
+
+  </span>
+    </el-dialog>
+</div>
+
+</body>
+<script src="../js/vue.js"></script>
+<script src="../js/elementui.js"></script>
+<script src="../js/axios.js"></script>
+
+<script>
+
+    new Vue({
+        el:"#app",
+        data(){
+            return{
+                tableData:[],
+                currentPage:1,
+                size:10,
+                total:10,
+                searchMap:{},
+                formVisible:false,
+                pojo:{},
+                imageUrl:''
+            }
+        },
+        created() {
+          this.fetchData();
+        },
+        methods:{
+            fetchData(){
+                axios.post(`/brand/findPage.do?page=${this.currentPage}&size=${this.size}`,this.searchMap).then(response=>{
+                    this.tableData=response.data.rows;
+                    this.total=response.data.total;
+                })
+            },
+            sava(){
+                this.pojo.image=this.imageUrl;  //往数据库中保存：把imageUrl赋值给pojo的image属性一同提交
+                axios.post(`/brand/${this.pojo.id==null?'add':'update'}.do`,this.pojo).then(response=>{
+                    //关闭弹框
+                    this.formVisible=false;
+
+                    //刷新数据
+                    this.fetchData();
+                })
+            },
+
+            /*
+            点击修改按钮后通过id查询对象  然后展示到弹出框中
+             */
+            edit(id){
+                this.formVisible=true;   //打开窗口
+                axios.get(`/brand/findById.do?id=${id}`).then( response=>{
+                    this.pojo = response.data;
+                    this.imageUrl=this.pojo.image;  //把查询到的对象的image属性赋值给imageUrl进行展示
+                })
+            },
+            dele(id){
+                this.$confirm('此操作将永久删除该文件, 是否继续?', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    axios.get(`/brand/delete.do?id=${id}`).then(response=>{
+                        this.fetchData();
+                    })
+                    this.$message({
+                        type: 'success',
+                        message: '删除成功!'
+                    });
+                }).catch(() => {
+                    this.$message({
+                        type: 'info',
+                        message: '已取消删除'
+                    });
+                });
+            },
+            /*
+            图片上传成功后做的操作
+             */
+            handleAvatarSuccess(res, file) {
+                this.imageUrl = file.response;
+            },
+            /*
+            图片上传成功之前做的操作
+             */
+            beforeAvatarUpload(file) {
+                const isJPG = file.type === 'image/jpeg';
+                const isLt2M = file.size / 1024 / 1024 < 2;
+
+                if (!isJPG) {
+                    this.$message.error('上传头像图片只能是 JPG 格式!');
+                }
+                if (!isLt2M) {
+                    this.$message.error('上传头像图片大小不能超过 2MB!');
+                }
+                return isJPG && isLt2M;
+            }
+
+
+        }
+    })
+
+
+</script>
+
+</html>
